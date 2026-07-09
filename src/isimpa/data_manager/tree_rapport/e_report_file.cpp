@@ -373,6 +373,8 @@ void E_Report_File::OnRightClic( wxMenu* leMenu )
 	if(fileInfo.IsDir())
 	{
 		leMenu->Append(GetMenuItem(leMenu,IDEVENT_RELOAD_FOLDER,wxGetTranslation("Refresh folder")));
+	}else{
+		leMenu->Append(GetMenuItem(leMenu,IDEVENT_EXPORT_REPORT_FILE,wxGetTranslation("Export...")));
 	}
 	Element::OnRightClic(leMenu);
 }

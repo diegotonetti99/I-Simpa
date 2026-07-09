@@ -362,6 +362,7 @@ public :
         IDEVENT_BFREQ_PRESELECTION_ALL,                /*!< \~english built-in event \~french Séléction automatique des bandes de fréquences */
         IDEVENT_NEW_USERDIRECTIV,
 		IDEVENT_RECEPTEURS_COMPUTE_STI,
+        IDEVENT_EXPORT_REPORT_FILE,                    /*!< \~english built-in event \~french Exporter un fichier de rapport vers un emplacement choisi par l'utilisateur */
         IDEVENT_LAST_FIXED /* !! This event must be the last, those before are "built-in" and those after are send to python */
     };
     /**

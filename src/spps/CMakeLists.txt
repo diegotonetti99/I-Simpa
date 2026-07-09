@@ -20,7 +20,9 @@ set(DATA_MANAGER_SOURCES
 
 set(IO_SOURCES
     input_output/reportmanager.h
-    input_output/reportmanager.cpp)
+    input_output/reportmanager.cpp
+    input_output/ambisonics_export.h
+    input_output/ambisonics_export.cpp)
 
 set(TOOLS_SOURCES
     tools/dotreflection.h

@@ -1,5 +1,6 @@
 #include "reportmanager.h"
 #include "tools/collision.h"
+#include "ambisonics_export.h"
 #include <cmath>
 #ifdef WIN32
 #include "input_output/pugixml/src/pugixml.hpp"
@@ -68,7 +69,9 @@ ReportManager::ReportManager(t_ParamReport& _paramReport)
 {
 	paramReport=_paramReport;
 	nbSource = paramReport.configManager->srcList.size();
-	timeStepInSourceOutput = (bool)*paramReport.configManager->FastGetConfigValue(Core_Configuration::I_PROP_OUTPUT_RECEIVER_BY_SOURCE);
+	// Per-source ambisonics export needs the same per-timestep, per-source resolution as "Echogram per source"
+	timeStepInSourceOutput = (bool)*paramReport.configManager->FastGetConfigValue(Core_Configuration::I_PROP_OUTPUT_RECEIVER_BY_SOURCE)
+		|| (bool)*paramReport.configManager->FastGetConfigValue(Core_Configuration::I_PROP_EXPORT_AMBISONICS);
 	tabEnergyByTimeStep=new l_decimal[_paramReport.nbTimeStep];
 	memset(tabEnergyByTimeStep,0,sizeof(l_decimal)*_paramReport.nbTimeStep);
 	lst_rp_lef.insert(lst_rp_lef.begin(),_paramReport.configManager->recepteur_p_List.size(),t_rp_lef());
@@ -227,9 +230,11 @@ void ReportManager::ParticuleFreeTranslation(CONF_PARTICULE& particleInfos, cons
 						lst_rp_lef[currentRecp->idrp].Lfc[particleInfos.pasCourant]+=energy*fabs(cosphi);
 
 						vec3 particleIntensity((particleInfos.direction/particleInfos.direction.length())*energy);
-						lst_rp_lef[currentRecp->idrp].intensity[particleInfos.pasCourant]+=veci_t(particleIntensity.x,particleIntensity.y,particleIntensity.z);
+						veci_t intensityContrib(particleIntensity.x,particleIntensity.y,particleIntensity.z);
+						lst_rp_lef[currentRecp->idrp].intensity[particleInfos.pasCourant]+=intensityContrib;
 						if(timeStepInSourceOutput) {
 							lst_rp_lef[currentRecp->idrp].SrcContrib[particleInfos.pasCourant*nbSource + particleInfos.sourceid]+=energy;
+							lst_rp_lef[currentRecp->idrp].intensityBySrc[particleInfos.pasCourant*nbSource + particleInfos.sourceid]+=intensityContrib;
 						} else {
 							lst_rp_lef[currentRecp->idrp].SrcContrib[particleInfos.sourceid]+=energy;
 						}
@@ -419,6 +424,12 @@ void ReportManager::FillWithLefData(t_sppsThreadParam& data)
 			l_decimal* srcContribCopy = new l_decimal[nbSource*paramReport.nbTimeStep];
 			memcpy(srcContribCopy, currentRp->SrcContrib, sizeof(l_decimal) * nbSource * paramReport.nbTimeStep);
 			data.SrcContrib.push_back(srcContribCopy);
+
+			veci_t* intensityBySrcCopy = new veci_t[nbSource*paramReport.nbTimeStep];
+			// veci_t (dvec3) is non-POD; memcpy of sizeof(veci_t) would be undefined behavior, copy element-wise.
+			for(std::size_t idcopy=0; idcopy<(std::size_t)nbSource*paramReport.nbTimeStep; idcopy++)
+				intensityBySrcCopy[idcopy] = currentRp->intensityBySrc[idcopy];
+			data.IntensityBySrc.push_back(intensityBySrcCopy);
 		}
 	}
 }
@@ -756,6 +767,89 @@ void ReportManager::SaveRecpIntensity(const CoreString& filename,std::vector<t_s
 		}
 	}
 
+}
+void ReportManager::SaveAmbisonicsImpulseResponse(std::vector<t_sppsThreadParam>& cols,const t_ParamReport& params)
+{
+	if(!(bool)*params.configManager->FastGetConfigValue(Core_Configuration::I_PROP_EXPORT_AMBISONICS))
+		return;
+
+	using namespace AmbisonicsExport;
+	const unsigned int randomSeed = (unsigned int)*params.configManager->FastGetConfigValue(Core_Configuration::I_PROP_RANDOM_SEED);
+	const CoreString workingDir = *params.configManager->FastGetConfigValue(Core_Configuration::SPROP_CORE_WORKING_DIRECTORY);
+	const CoreString rootRp = workingDir + CoreString(*params.configManager->FastGetConfigValue(Base_Core_Configuration::SPROP_PONCTUAL_RECEIVER_FOLDER_PATH) + st_path_separator());
+	const std::size_t srcCount = params.configManager->srcList.size();
+
+	for(uentier idrecp=0; idrecp<params.configManager->recepteur_p_List.size(); idrecp++)
+	{
+		t_Recepteur_P* currentRP = params.configManager->recepteur_p_List[idrecp];
+		CoreString recpFolder = rootRp + currentRP->lblRp + st_path_separator();
+		st_mkdir(recpFolder);
+
+		// Combined impulse response (all sources summed)
+		{
+			std::vector<t_BandContribution> bands;
+			std::vector<std::vector<veci_t> > directionBuffers; // keep the buffers alive until the write call below
+			bands.reserve(cols.size());
+			directionBuffers.reserve(cols.size());
+			for(std::size_t idfreq=0; idfreq<cols.size(); idfreq++)
+			{
+				if(!params.configManager->freqList[idfreq]->doCalculation)
+					continue;
+				std::vector<veci_t> direction(params.nbTimeStep);
+				for(entier idstep=0; idstep<params.nbTimeStep; idstep++)
+				{
+					direction[idstep]=veci_t(
+						cols[idfreq].GabeIntensity[0][idrecp]->GetValue(idstep),
+						cols[idfreq].GabeIntensity[1][idrecp]->GetValue(idstep),
+						cols[idfreq].GabeIntensity[2][idrecp]->GetValue(idstep));
+				}
+				directionBuffers.push_back(direction);
+				t_BandContribution band;
+				band.centerFreq = params.configManager->freqList[idfreq]->freqValue;
+				band.energyPerBin = currentRP->energy_sum[idfreq];
+				band.directionPerBin = directionBuffers.back().data();
+				bands.push_back(band);
+			}
+			WriteBFormatImpulseResponse(recpFolder+"Ambisonics.wav", bands, params.nbTimeStep, params.timeStep, randomSeed);
+		}
+
+		// Per-source impulse responses. I_PROP_EXPORT_AMBISONICS already forced
+		// timeStepInSourceOutput on for every frequency thread (see ReportManager
+		// ctor), so SrcContrib/IntensityBySrc are guaranteed to be populated here.
+		for(std::size_t idsrc=0; idsrc<srcCount; idsrc++)
+		{
+			std::vector<t_BandContribution> bands;
+			std::vector<std::vector<l_decimal> > energyBuffers;
+			std::vector<std::vector<veci_t> > directionBuffers;
+			bands.reserve(cols.size());
+			energyBuffers.reserve(cols.size());
+			directionBuffers.reserve(cols.size());
+			for(std::size_t idfreq=0; idfreq<cols.size(); idfreq++)
+			{
+				if(!params.configManager->freqList[idfreq]->doCalculation)
+					continue;
+				const l_decimal* srcContrib = cols[idfreq].SrcContrib[idrecp];
+				const veci_t* intensityBySrc = cols[idfreq].IntensityBySrc[idrecp];
+				std::vector<l_decimal> energy(params.nbTimeStep);
+				std::vector<veci_t> direction(params.nbTimeStep);
+				for(entier idstep=0; idstep<params.nbTimeStep; idstep++)
+				{
+					energy[idstep]=srcContrib[idstep*srcCount+idsrc];
+					direction[idstep]=intensityBySrc[idstep*srcCount+idsrc];
+				}
+				energyBuffers.push_back(energy);
+				directionBuffers.push_back(direction);
+				t_BandContribution band;
+				band.centerFreq = params.configManager->freqList[idfreq]->freqValue;
+				band.energyPerBin = energyBuffers.back().data();
+				band.directionPerBin = directionBuffers.back().data();
+				bands.push_back(band);
+			}
+			CoreString srcFolder = recpFolder + params.configManager->srcList[idsrc]->sourceName + st_path_separator();
+			st_mkdir(srcFolder);
+			WriteBFormatImpulseResponse(srcFolder+"Ambisonics.wav", bands, params.nbTimeStep, params.timeStep, randomSeed);
+		}
+	}
 }
 void ReportManager::SaveRecpAcousticParamsAdvance(const CoreString& filename,std::vector<t_sppsThreadParam>& cols,const t_ParamReport& params)
 {

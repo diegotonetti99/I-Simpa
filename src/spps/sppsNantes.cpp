@@ -405,6 +405,10 @@ int MainProcess(int argc, char* argv[])
 	if (verbose_mode) { cout << "Saving sound level for each Ponctual Receiver per source..." << endl; }
 	ReportManager::SaveSoundLevelBySource("Sound level per source.recps",threadsData,reportParameter);
 	if (verbose_mode) { cout << "End of save sound level for each Ponctual Receiver per source." << endl; }
+
+	if (verbose_mode) { cout << "Saving Ambisonics impulse response for each Ponctual Receiver..." << endl; }
+	ReportManager::SaveAmbisonicsImpulseResponse(threadsData,reportParameter);
+	if (verbose_mode) { cout << "End of save of Ambisonics impulse response." << endl; }
     st_mkdir(workingDir + *configManager.FastGetConfigValue(Core_Configuration::SPROP_RECEPTEUR_SURFACIQUE_FOLDER_PATH));
     stringClass globalRecSurfPath=workingDir+*configManager.FastGetConfigValue(Core_Configuration::SPROP_RECEPTEUR_SURFACIQUE_FOLDER_PATH)+"Global"+ st_path_separator();
 	//Création du dossier Global

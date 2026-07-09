@@ -58,6 +58,10 @@ bool E_Report_Unknown::ExtKnownByCurrentOs(const wxString& fileName)
 	wxFileName fileConstr(fileName);
 	if(fileConstr.GetExt().empty())
 		return false;
+	// wxTheMimeTypesManager's OS lookup is unreliable inside the Flatpak sandbox
+	// (no host application-association access), so treat .wav as always known.
+	if(fileConstr.GetExt().CmpNoCase("wav") == 0)
+		return true;
 	wxFileType *ft = wxTheMimeTypesManager->GetFileTypeFromExtension(fileConstr.GetExt());
     if ( !ft )
     {

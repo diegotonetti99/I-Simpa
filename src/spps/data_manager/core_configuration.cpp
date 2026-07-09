@@ -56,6 +56,11 @@ Core_Configuration::Core_Configuration( CoreString xmlFilePath, bool verbose_mod
                 saveReceiversIntersection = simuNode->GetProperty("save_receivers_intersection").ToInt();
             }
             SetConfigInformation(I_PROP_SAVE_RECEIVER_INTERSECTION, saveReceiversIntersection);
+			int exportAmbisonics = 0;
+			if(simuNode->IsPropertyExist("export_ambisonics")) {
+				exportAmbisonics = simuNode->GetProperty("export_ambisonics").ToInt();
+			}
+			SetConfigInformation(I_PROP_EXPORT_AMBISONICS, exportAmbisonics);
 
 			SetConfigInformation(I_PROP_RANDOM_SEED,seed);
 			SetConfigInformation(IPROP_DO_CALC_CHAMP_DIRECT,simuNode->GetProperty("direct_calc").ToInt());

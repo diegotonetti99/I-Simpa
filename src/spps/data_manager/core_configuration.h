@@ -54,7 +54,8 @@ public:
 		I_PROP_OUTPUT_RECEIVER_BY_SOURCE,			/*!< 0 Output soundprec.recp, 1 output soudprec.recp by source */
 		I_PROP_RANDOM_SEED,							/*!< Random SEED */
         I_PROP_SAVE_SURFACE_INTERSECTION,           /*!< Save particle and surface intersection events*/
-        I_PROP_SAVE_RECEIVER_INTERSECTION           /*!< Save particle and receiver intersection events*/
+        I_PROP_SAVE_RECEIVER_INTERSECTION,          /*!< Save particle and receiver intersection events*/
+        I_PROP_EXPORT_AMBISONICS                    /*!< Export a first-order B-format (WXYZ) impulse response for punctual receivers */
 	};
 
 	/**

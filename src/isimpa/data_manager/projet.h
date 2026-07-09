@@ -658,6 +658,7 @@ private:
 	void OnMenuLoadRecepteurspSimulation(Element* elRpRecord,Element::IDEVENT loadingMethod);
 
 	void OnOpenFolder(Element* folder);
+	void OnExportReportFile(Element* reportElement);
 	void OnDrawableElementDelete();
 
 

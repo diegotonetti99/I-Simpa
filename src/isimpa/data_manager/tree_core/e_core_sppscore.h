@@ -81,6 +81,9 @@ protected:
 	void InitOutputRecpBySource(Element* confCore) {
 		confCore->AppendPropertyBool("output_recp_bysource", wxTRANSLATE("Echogram per source"), false, true);
 	}
+	void InitExportAmbisonics(Element* confCore) {
+		confCore->AppendPropertyBool("export_ambisonics", wxTRANSLATE("Export ambisonics impulse response for punctual receivers (B-format, FuMa WXYZ channel order: channel 1=W, 2=X, 3=Y, 4=Z)"), false, true);
+	}
 	void InitRandomSeed(Element* confCore) {
 		confCore->AppendPropertyInteger("random_seed",wxTRANSLATE("Random initialization number"), 0,true, false, true);
 	}
@@ -108,6 +111,9 @@ public:
               InitSurfaceReceiverMethod(confCore);
             if (!confCore->IsPropertyExist("output_recp_bysource")) {
               InitOutputRecpBySource(confCore);
+            }
+            if (!confCore->IsPropertyExist("export_ambisonics")) {
+              InitExportAmbisonics(confCore);
             }
             if (!confCore->IsPropertyExist("random_seed")) {
               InitRandomSeed(confCore);
@@ -148,6 +154,7 @@ public:
 		InitExportRs(confCore);
 		InitSurfaceReceiverMethod(confCore);
 		InitOutputRecpBySource(confCore);
+		InitExportAmbisonics(confCore);
 		InitRandomSeed(confCore);
 		//Ajout des propriétés propres à spps
 		std::vector<wxString> computationMethods;

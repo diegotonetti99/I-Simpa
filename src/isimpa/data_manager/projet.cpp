@@ -455,6 +455,9 @@ void ProjectManager::ElementEvent(wxCommandEvent& eventElement,eventCtrl fromCtr
 		case Element::IDEVENT_OPEN_FOLDER:
 			OnOpenFolder(elementSelected);
 			break;
+		case Element::IDEVENT_EXPORT_REPORT_FILE:
+			OnExportReportFile(elementSelected);
+			break;
 		default:
 			PassiveEvent=false;
 		};
@@ -1550,6 +1553,24 @@ void ProjectManager::OnOpenFolder(Element* folder)
 	if(elfolder)
 	{
 		elfolder->OpenFolder();
+	}
+}
+void ProjectManager::OnExportReportFile(Element* reportElement)
+{
+	E_Report_File* reportFile=dynamic_cast<E_Report_File*>(reportElement);
+	if(!reportFile)
+		return;
+	wxString fullPath;
+	reportFile->BuildFullPath(fullPath);
+	if(!wxFileExists(fullPath))
+		return;
+	wxFileName srcFileName(fullPath);
+	wxFileDialog saveFileDialog(mainFrame, wxGetTranslation("Export..."), "", srcFileName.GetFullName(),
+		"All files (*.*)|*.*", wxFD_SAVE | wxFD_OVERWRITE_PROMPT, wxDefaultPosition);
+	if(saveFileDialog.ShowModal() == wxID_OK)
+	{
+		if(!wxCopyFile(fullPath, saveFileDialog.GetPath()))
+			wxLogError(wxGetTranslation("Unable to export file"));
 	}
 }
 void ProjectManager::OnMenuLoadRecepteurspSimulation(Element* elRpRecord,Element::IDEVENT loadingMethod)

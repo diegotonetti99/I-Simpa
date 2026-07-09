@@ -16,6 +16,8 @@
  * Certains fichiers de résultats nécessitent une sortie comprenant toutes les bande de fréquences
  * ainsi on doit stocker les données propres aux bandes de fréquence en dehors du thread de la bande sonore actuelle
  */
+typedef dvec3 veci_t;
+
 struct t_Stats
 {
     uentier_long partLost;
@@ -39,6 +41,7 @@ struct t_sppsThreadParam
 	std::vector<formatGABE::GABE_Data_Float*> GabeIntensity[3];			/*!< Vecteur d'intensité en X,Y,Z \f$frac{W_{n}.Isec.\frac{\overrightarrow{Dir}}{\Vert\overrightarrow{Dir}\Vert}}{V}\f$ */
 	std::vector<formatGABE::GABE_Data_Float*> GabeSlPerSrc;				/*!< Niveau sonore par source */
 	std::vector<l_decimal*> SrcContrib;									/*!< For each receiver, If timeStepInSourceOutput is true, contains the source contrib by time step */
+	std::vector<veci_t*> IntensityBySrc;									/*!< For each receiver, If timeStepInSourceOutput is true, contains the energy-weighted direction vector sum by source and time step (same indexing as SrcContrib) */
     t_Stats particleStats;
 	void clearMem()
 	{
@@ -51,16 +54,17 @@ struct t_sppsThreadParam
 		for(short dim=0;dim<3;dim++)
 			for(uentier idrecp=0;idrecp<GabeSumEnergyCosSqrtPhi.size();idrecp++)
 				delete GabeIntensity[dim][idrecp];
-		for(uentier idrecp=0;idrecp<SrcContrib.size();idrecp++) 
+		for(uentier idrecp=0;idrecp<SrcContrib.size();idrecp++)
 			delete[] SrcContrib[idrecp];
+		for(uentier idrecp=0;idrecp<IntensityBySrc.size();idrecp++)
+			delete[] IntensityBySrc[idrecp];
 	}
 };
-typedef dvec3 veci_t;
 class t_rp_lef
 {
 public:
-	t_rp_lef(){Lf=NULL;Lfc=NULL;intensity=NULL;SrcContrib=NULL;}
-	~t_rp_lef(){delete[] Lf;delete[] Lfc;delete[] intensity;delete[] SrcContrib;}
+	t_rp_lef(){Lf=NULL;Lfc=NULL;intensity=NULL;SrcContrib=NULL;intensityBySrc=NULL;}
+	~t_rp_lef(){delete[] Lf;delete[] Lfc;delete[] intensity;delete[] SrcContrib;delete[] intensityBySrc;}
 	void Init(const int & nbTimeStep,const size_t & nbsources, const bool& sourceLvlByTimeStep)
 	{
 		size_t sourceContribCols;
@@ -76,11 +80,15 @@ public:
 		memset(Lf,0,nbTimeStep*sizeof(l_decimal));
 		memset(Lfc,0,nbTimeStep*sizeof(l_decimal));
 		memset(SrcContrib,0,sourceContribCols*sizeof(l_decimal));
+		if(sourceLvlByTimeStep) {
+			intensityBySrc=new veci_t[sourceContribCols]; // default-constructed, i.e. zeroed
+		}
 	}
 	l_decimal* Lf;
 	l_decimal* Lfc;
 	l_decimal* SrcContrib;
 	veci_t* intensity;
+	veci_t* intensityBySrc; /*!< Only allocated when sourceLvlByTimeStep; sized nbsources*nbTimeStep, same indexing as SrcContrib */
 };
 /**
  * @brief Gestionnaire de fichier de sortie à déstination de l'interface PSPS
@@ -236,6 +244,11 @@ public:
 	 * Sauvegarde le tableau contenants les données de niveau sonore en fonction des sources
 	 */
 	static void SaveSoundLevelBySource(const CoreString& filename,std::vector<t_sppsThreadParam>& cols,const t_ParamReport& params);
+	/**
+	 * Sauvegarde, pour chaque récepteur ponctuel, une réponse impulsionnelle ambisonique (B-format WXYZ),
+	 * combinée pour toutes les sources et, si "Echogram per source" est actif, une par source
+	 */
+	static void SaveAmbisonicsImpulseResponse(std::vector<t_sppsThreadParam>& cols,const t_ParamReport& params);
 
 
 	static void SetPostProcessSurfaceReceiver(Core_Configuration& coreConfig ,const std::size_t& freqIndex,std::vector<r_Surf*>& surface_receiver_list,const float& timeStep);
